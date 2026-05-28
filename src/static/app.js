@@ -24,6 +24,46 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginForm = document.getElementById("login-form");
   const closeLoginModal = document.querySelector(".close-login-modal");
   const loginMessage = document.getElementById("login-message");
+  const announcementBannerList = document.getElementById(
+    "announcement-banner-list"
+  );
+  const announcementBannerStatus = document.getElementById(
+    "announcement-banner-status"
+  );
+  const manageAnnouncementsButton = document.getElementById(
+    "manage-announcements-button"
+  );
+  const announcementsModal = document.getElementById("announcements-modal");
+  const closeAnnouncementsModal = document.querySelector(
+    ".close-announcements-modal"
+  );
+  const announcementList = document.getElementById("announcement-list");
+  const announcementForm = document.getElementById("announcement-form");
+  const announcementFormTitle = document.getElementById(
+    "announcement-form-title"
+  );
+  const announcementIdInput = document.getElementById("announcement-id");
+  const announcementTitleInput = document.getElementById(
+    "announcement-title"
+  );
+  const announcementMessageInput = document.getElementById(
+    "announcement-message"
+  );
+  const announcementStartsAtInput = document.getElementById(
+    "announcement-starts-at"
+  );
+  const announcementExpiresAtInput = document.getElementById(
+    "announcement-expires-at"
+  );
+  const newAnnouncementButton = document.getElementById(
+    "new-announcement-button"
+  );
+  const cancelAnnouncementEditButton = document.getElementById(
+    "cancel-announcement-edit"
+  );
+  const announcementsAdminMessage = document.getElementById(
+    "announcements-admin-message"
+  );
 
   // Activity categories with corresponding colors
   const activityTypes = {
@@ -43,6 +83,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Authentication state
   let currentUser = null;
+  let activeAnnouncements = [];
+  let managedAnnouncements = [];
+  let editingAnnouncementId = null;
 
   // Time range mappings for the dropdown
   const timeRanges = {
@@ -50,6 +93,391 @@ document.addEventListener("DOMContentLoaded", () => {
     afternoon: { start: "15:00", end: "18:00" }, // Após as aulas
     weekend: { days: ["Saturday", "Sunday"] }, // Final de semana
   };
+
+  function getTodayIsoDate() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  async function parseJsonResponse(response) {
+    try {
+      return await response.json();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function formatDateLabel(rawDate) {
+    if (!rawDate) {
+      return "Imediato";
+    }
+
+    return new Date(`${rawDate}T00:00:00`).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function getAnnouncementWindowText(announcement) {
+    const parts = [];
+
+    if (announcement.starts_at) {
+      parts.push(`De ${formatDateLabel(announcement.starts_at)}`);
+    } else {
+      parts.push("Visível imediatamente");
+    }
+
+    parts.push(`Até ${formatDateLabel(announcement.expires_at)}`);
+    return parts.join(" • ");
+  }
+
+  function getAnnouncementStatus(announcement) {
+    const today = getTodayIsoDate();
+
+    if (announcement.starts_at && announcement.starts_at > today) {
+      return { label: "Agendado", className: "scheduled" };
+    }
+
+    if (announcement.expires_at < today) {
+      return { label: "Expirado", className: "expired" };
+    }
+
+    return { label: "Ativo", className: "active" };
+  }
+
+  function clearAnnouncementForm() {
+    editingAnnouncementId = null;
+    announcementIdInput.value = "";
+    announcementForm.reset();
+    announcementFormTitle.textContent = "Novo anúncio";
+  }
+
+  function setAnnouncementFormValues(announcement) {
+    editingAnnouncementId = announcement.id;
+    announcementIdInput.value = announcement.id;
+    announcementTitleInput.value = announcement.title;
+    announcementMessageInput.value = announcement.message;
+    announcementStartsAtInput.value = announcement.starts_at || "";
+    announcementExpiresAtInput.value = announcement.expires_at || "";
+    announcementFormTitle.textContent = "Editar anúncio";
+  }
+
+  function showAnnouncementsAdminMessage(text, type) {
+    announcementsAdminMessage.textContent = text;
+    announcementsAdminMessage.className = `message ${type}`;
+    announcementsAdminMessage.classList.remove("hidden");
+
+    setTimeout(() => {
+      announcementsAdminMessage.classList.add("hidden");
+    }, 4000);
+  }
+
+  function renderAnnouncementBanner() {
+    announcementBannerList.innerHTML = "";
+
+    if (!activeAnnouncements.length) {
+      announcementBannerStatus.textContent =
+        "Nenhum anúncio ativo no momento.";
+
+      const emptyState = document.createElement("div");
+      emptyState.className = "announcement-empty-state";
+
+      const title = document.createElement("h4");
+      title.textContent = "Tudo em ordem por aqui";
+
+      const description = document.createElement("p");
+      description.textContent =
+        "Novos comunicados aparecerão aqui assim que forem publicados pela equipe da escola.";
+
+      emptyState.appendChild(title);
+      emptyState.appendChild(description);
+      announcementBannerList.appendChild(emptyState);
+      return;
+    }
+
+    announcementBannerStatus.textContent =
+      activeAnnouncements.length === 1
+        ? "1 anúncio ativo para acompanhar hoje."
+        : `${activeAnnouncements.length} anúncios ativos para acompanhar hoje.`;
+
+    activeAnnouncements.forEach((announcement) => {
+      const card = document.createElement("article");
+      card.className = "announcement-card";
+
+      const title = document.createElement("h4");
+      title.textContent = announcement.title;
+
+      const message = document.createElement("p");
+      message.textContent = announcement.message;
+
+      const meta = document.createElement("p");
+      meta.className = "announcement-card-meta";
+      meta.textContent = getAnnouncementWindowText(announcement);
+
+      card.appendChild(title);
+      card.appendChild(message);
+      card.appendChild(meta);
+      announcementBannerList.appendChild(card);
+    });
+  }
+
+  function renderAnnouncementAdminList() {
+    announcementList.innerHTML = "";
+
+    if (!managedAnnouncements.length) {
+      const emptyState = document.createElement("div");
+      emptyState.className = "announcement-admin-empty";
+
+      const title = document.createElement("h5");
+      title.textContent = "Nenhum anúncio cadastrado";
+
+      const description = document.createElement("p");
+      description.textContent =
+        "Crie o primeiro comunicado para preencher o banner da página inicial.";
+
+      emptyState.appendChild(title);
+      emptyState.appendChild(description);
+      announcementList.appendChild(emptyState);
+      return;
+    }
+
+    managedAnnouncements.forEach((announcement) => {
+      const item = document.createElement("article");
+      item.className = "announcement-admin-item";
+
+      if (editingAnnouncementId === announcement.id) {
+        item.classList.add("is-selected");
+      }
+
+      const header = document.createElement("div");
+      header.className = "announcement-admin-header";
+
+      const headingGroup = document.createElement("div");
+      const title = document.createElement("h5");
+      title.textContent = announcement.title;
+      headingGroup.appendChild(title);
+
+      const status = getAnnouncementStatus(announcement);
+      const chip = document.createElement("span");
+      chip.className = `status-chip ${status.className}`;
+      chip.textContent = status.label;
+
+      header.appendChild(headingGroup);
+      header.appendChild(chip);
+
+      const body = document.createElement("p");
+      body.className = "announcement-admin-body";
+      body.textContent = announcement.message;
+
+      const meta = document.createElement("p");
+      meta.className = "announcement-admin-meta";
+      meta.textContent = `${getAnnouncementWindowText(
+        announcement
+      )} • Atualizado por ${announcement.updated_by || "equipe"}`;
+
+      const actions = document.createElement("div");
+      actions.className = "announcement-item-actions";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "ghost-button";
+      editButton.textContent = "Editar";
+      editButton.addEventListener("click", () => {
+        setAnnouncementFormValues(announcement);
+        renderAnnouncementAdminList();
+      });
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "danger-button";
+      deleteButton.textContent = "Excluir";
+      deleteButton.addEventListener("click", () => {
+        showConfirmationDialog(
+          `Deseja excluir o anúncio \"${announcement.title}\"?`,
+          async () => {
+            await deleteAnnouncement(announcement.id);
+          }
+        );
+      });
+
+      actions.appendChild(editButton);
+      actions.appendChild(deleteButton);
+
+      item.appendChild(header);
+      item.appendChild(body);
+      item.appendChild(meta);
+      item.appendChild(actions);
+      announcementList.appendChild(item);
+    });
+  }
+
+  async function fetchAnnouncements() {
+    try {
+      const response = await fetch("/announcements");
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok) {
+        throw new Error("failed-to-load-announcements");
+      }
+
+      activeAnnouncements = data || [];
+      renderAnnouncementBanner();
+    } catch (error) {
+      activeAnnouncements = [];
+      renderAnnouncementBanner();
+      announcementBannerStatus.textContent =
+        "Não foi possível carregar os anúncios agora.";
+      console.error("Erro ao buscar anúncios:", error);
+    }
+  }
+
+  async function fetchManagedAnnouncements() {
+    if (!currentUser) {
+      managedAnnouncements = [];
+      renderAnnouncementAdminList();
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/announcements?include_all=true&teacher_username=${encodeURIComponent(
+          currentUser.username
+        )}`
+      );
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          closeAnnouncementsModalHandler();
+          showMessage(
+            "Sua sessão não está autorizada a gerenciar anúncios.",
+            "error"
+          );
+          return;
+        }
+
+        throw new Error("failed-to-load-managed-announcements");
+      }
+
+      managedAnnouncements = data || [];
+
+      if (editingAnnouncementId) {
+        const selectedAnnouncement = managedAnnouncements.find(
+          (announcement) => announcement.id === editingAnnouncementId
+        );
+
+        if (selectedAnnouncement) {
+          setAnnouncementFormValues(selectedAnnouncement);
+        } else {
+          clearAnnouncementForm();
+        }
+      }
+
+      renderAnnouncementAdminList();
+    } catch (error) {
+      console.error("Erro ao buscar anúncios para gestão:", error);
+      showAnnouncementsAdminMessage(
+        "Não foi possível carregar a lista de anúncios. Tente novamente.",
+        "error"
+      );
+    }
+  }
+
+  async function saveAnnouncement(payload) {
+    const isEditing = Boolean(editingAnnouncementId);
+    const endpoint = isEditing
+      ? `/announcements/${encodeURIComponent(
+          editingAnnouncementId
+        )}?teacher_username=${encodeURIComponent(currentUser.username)}`
+      : `/announcements?teacher_username=${encodeURIComponent(
+          currentUser.username
+        )}`;
+
+    const response = await fetch(endpoint, {
+      method: isEditing ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await parseJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data?.detail || "announcement-save-failed");
+    }
+
+    await fetchAnnouncements();
+    editingAnnouncementId = data.id;
+    await fetchManagedAnnouncements();
+    showAnnouncementsAdminMessage(
+      isEditing ? "Anúncio atualizado com sucesso." : "Anúncio criado com sucesso.",
+      "success"
+    );
+  }
+
+  async function deleteAnnouncement(announcementId) {
+    if (!currentUser) {
+      showMessage("Você precisa estar logado para gerenciar anúncios.", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/announcements/${encodeURIComponent(
+          announcementId
+        )}?teacher_username=${encodeURIComponent(currentUser.username)}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "announcement-delete-failed");
+      }
+
+      if (editingAnnouncementId === announcementId) {
+        clearAnnouncementForm();
+      }
+
+      await fetchAnnouncements();
+      await fetchManagedAnnouncements();
+      showAnnouncementsAdminMessage("Anúncio excluído com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao excluir anúncio:", error);
+      showAnnouncementsAdminMessage(
+        "Não foi possível excluir o anúncio. Tente novamente.",
+        "error"
+      );
+    }
+  }
+
+  function openAnnouncementsModal() {
+    if (!currentUser) {
+      showMessage("Faça login para gerenciar anúncios.", "info");
+      openLoginModal();
+      return;
+    }
+
+    announcementsModal.classList.remove("hidden");
+    announcementsModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => {
+      announcementsModal.classList.add("show");
+    }, 10);
+
+    announcementsAdminMessage.classList.add("hidden");
+    fetchManagedAnnouncements();
+  }
+
+  function closeAnnouncementsModalHandler() {
+    announcementsModal.classList.remove("show");
+    announcementsModal.setAttribute("aria-hidden", "true");
+
+    setTimeout(() => {
+      announcementsModal.classList.add("hidden");
+    }, 300);
+  }
 
   // Initialize filters from active elements
   function initializeFilters() {
@@ -146,15 +574,23 @@ document.addEventListener("DOMContentLoaded", () => {
       loginButton.classList.add("hidden");
       userInfo.classList.remove("hidden");
       displayName.textContent = currentUser.display_name;
+      manageAnnouncementsButton.classList.remove("hidden");
     } else {
       loginButton.classList.remove("hidden");
       userInfo.classList.add("hidden");
       displayName.textContent = "";
+      manageAnnouncementsButton.classList.add("hidden");
+      managedAnnouncements = [];
+      clearAnnouncementForm();
+      if (!announcementsModal.classList.contains("hidden")) {
+        closeAnnouncementsModalHandler();
+      }
     }
 
     updateAuthBodyClass();
     // Refresh the activities to update the UI
     fetchActivities();
+    fetchAnnouncements();
   }
 
   // Update body class for CSS targeting
@@ -236,13 +672,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Event listeners for authentication
   loginButton.addEventListener("click", openLoginModal);
+  manageAnnouncementsButton.addEventListener("click", openAnnouncementsModal);
   logoutButton.addEventListener("click", logout);
   closeLoginModal.addEventListener("click", closeLoginModalHandler);
+  closeAnnouncementsModal.addEventListener(
+    "click",
+    closeAnnouncementsModalHandler
+  );
+  newAnnouncementButton.addEventListener("click", () => {
+    clearAnnouncementForm();
+    renderAnnouncementAdminList();
+  });
+  cancelAnnouncementEditButton.addEventListener("click", () => {
+    clearAnnouncementForm();
+    renderAnnouncementAdminList();
+  });
 
   // Close login modal when clicking outside
   window.addEventListener("click", (event) => {
     if (event.target === loginModal) {
       closeLoginModalHandler();
+    }
+
+    if (event.target === announcementsModal) {
+      closeAnnouncementsModalHandler();
     }
   });
 
@@ -252,6 +705,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
     await login(username, password);
+  });
+
+  announcementForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!currentUser) {
+      showMessage("Você precisa estar logado para gerenciar anúncios.", "error");
+      closeAnnouncementsModalHandler();
+      return;
+    }
+
+    const payload = {
+      title: announcementTitleInput.value.trim(),
+      message: announcementMessageInput.value.trim(),
+      starts_at: announcementStartsAtInput.value || null,
+      expires_at: announcementExpiresAtInput.value,
+    };
+
+    try {
+      await saveAnnouncement(payload);
+    } catch (error) {
+      console.error("Erro ao salvar anúncio:", error);
+      showAnnouncementsAdminMessage(
+        "Não foi possível salvar o anúncio. Revise os campos e tente novamente.",
+        "error"
+      );
+    }
   });
 
   // Show loading skeletons
@@ -902,5 +1382,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize app
   checkAuthentication();
   initializeFilters();
+  renderAnnouncementBanner();
+  renderAnnouncementAdminList();
+  fetchAnnouncements();
   fetchActivities();
 });
