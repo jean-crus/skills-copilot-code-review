@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,21 +12,37 @@
     />
   </head>
   <body>
-     <div class="announcement-banner">
-      📢 As inscrições para atividades estão abertas até o final do mês. Não perca sua vaga!
-    </div>
+    <section class="announcement-banner" aria-labelledby="announcement-heading">
+      <div class="announcement-banner-shell">
+        <div class="announcement-banner-intro">
+          <p class="announcement-eyebrow">Comunicados</p>
+          <h3 id="announcement-heading">Atualizações da escola</h3>
+          <p id="announcement-banner-status">Carregando anúncios...</p>
+        </div>
+        <div id="announcement-banner-list" class="announcement-banner-list" aria-live="polite"></div>
+      </div>
+    </section>
     <header>
       <h1>Mergington High School</h1>
       <h2>Atividades Extracurriculares</h2>
       <div id="user-controls">
+        <button
+          id="manage-announcements-button"
+          class="secondary-header-button hidden"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="announcements-modal"
+        >
+          Gerenciar anúncios
+        </button>
         <div id="user-status">
-          <button id="login-button" class="icon-button">
+          <button id="login-button" class="icon-button" type="button">
             <span class="user-icon">👤</span>
             <span>Entrar</span>
           </button>
           <div id="user-info" class="hidden">
             <span id="display-name"></span>
-            <button id="logout-button">Sair</button>
+            <button id="logout-button" type="button">Sair</button>
           </div>
         </div>
       </div>
@@ -104,7 +120,7 @@
     <!-- Registration Modal -->
     <div id="registration-modal" class="modal hidden">
       <div class="modal-content">
-        <span class="close-modal">&times;</span>
+        <span class="close-modal" aria-label="Fechar formulário de registro">&times;</span>
             <h3>Registrar para <span id="modal-activity-name"></span></h3>
         <form id="signup-form">
           <div class="form-group">
@@ -120,7 +136,7 @@
     <!-- Login Modal -->
     <div id="login-modal" class="modal hidden">
       <div class="modal-content">
-        <span class="close-login-modal">&times;</span>
+        <span class="close-login-modal" aria-label="Fechar login">&times;</span>
         <h3>Login do Professor</h3>
         <form id="login-form">
           <div class="form-group">
@@ -134,6 +150,73 @@
           <button type="submit">Entrar</button>
         </form>
         <div id="login-message" class="hidden message"></div>
+      </div>
+    </div>
+
+    <div id="announcements-modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-content announcements-modal-content">
+        <span class="close-announcements-modal" aria-label="Fechar gerenciador de anúncios">&times;</span>
+        <div class="announcements-modal-header">
+          <p class="announcement-eyebrow">Painel interno</p>
+          <h3>Gerenciar anúncios</h3>
+          <p>Crie comunicados com vigência definida, revise itens programados e remova anúncios expirados.</p>
+        </div>
+        <div class="announcements-modal-layout">
+          <section class="announcements-panel" aria-labelledby="announcement-list-title">
+            <div class="announcements-panel-topbar">
+              <div>
+                <h4 id="announcement-list-title">Anúncios cadastrados</h4>
+                <p>Selecione um item para editar ou exclua o que não deve mais aparecer.</p>
+              </div>
+              <button id="new-announcement-button" type="button">Novo anúncio</button>
+            </div>
+            <div id="announcements-admin-message" class="hidden message"></div>
+            <div id="announcement-list" class="announcement-admin-list" aria-live="polite"></div>
+          </section>
+
+          <section class="announcements-editor" aria-labelledby="announcement-form-title">
+            <h4 id="announcement-form-title">Novo anúncio</h4>
+            <form id="announcement-form">
+              <input type="hidden" id="announcement-id" />
+              <div class="form-group">
+                <label for="announcement-title">Título</label>
+                <input
+                  type="text"
+                  id="announcement-title"
+                  maxlength="120"
+                  required
+                  placeholder="Ex.: Prazo final para inscrições de inverno"
+                />
+              </div>
+              <div class="form-group">
+                <label for="announcement-message">Mensagem</label>
+                <textarea
+                  id="announcement-message"
+                  rows="5"
+                  maxlength="500"
+                  required
+                  placeholder="Explique o comunicado com contexto suficiente para professores e responsáveis."
+                ></textarea>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="announcement-starts-at">Data de início</label>
+                  <input type="date" id="announcement-starts-at" />
+                  <small>Opcional. Se vazio, o anúncio pode aparecer imediatamente.</small>
+                </div>
+                <div class="form-group">
+                  <label for="announcement-expires-at">Data de expiração</label>
+                  <input type="date" id="announcement-expires-at" required />
+                  <small>Obrigatória. Após essa data, o anúncio deixa de ser exibido.</small>
+                </div>
+              </div>
+              <div class="announcement-form-actions">
+                <button id="cancel-announcement-edit" class="ghost-button" type="button">Limpar</button>
+                <button type="submit">Salvar anúncio</button>
+              </div>
+            </form>
+          </section>
+        </div>
       </div>
     </div>
 
