@@ -218,8 +218,8 @@ initial_teachers = [
 initial_announcements = [
     {
         "id": "welcome-enrollment-window",
-        "title": "Inscricoes abertas para atividades",
-        "message": "As inscricoes para atividades extracurriculares estao abertas. Revise as vagas disponiveis e organize sua turma antes do encerramento do periodo.",
+        "title": "Inscrições abertas para atividades",
+        "message": "As inscrições para atividades extracurriculares estão abertas. Revise as vagas disponíveis e organize sua turma antes do encerramento do período.",
         "starts_at": None,
         "expires_at": "2099-12-31",
         "created_by": "principal",
